@@ -1,0 +1,187 @@
+
+%% 1) run segment anatomical MR in SPM5
+% startup SPM (spm functions are used)
+% coregister + reslice CT to anatomical MR
+% in SPM5 reference image = MR, source image = CT
+% segment MR
+%% 2) generate surface (The Hull) to project electrodes to
+
+% get_mask(subject,gray,white,outputdir,degree of smoothing,threshold) 
+% e.g. get_mask(6,0.1) or get_mask(16,0.3)
+
+% if using SPM segmentation to create mask
+% get_mask('name',10,0.2);% for popups
+get_mask_V1('CM',...
+    16,0.3,...% settings for smoothing and threshold
+    './data_CM/CM_seg_gray_3layer.nii',...% gray matter segmentation probability map
+    './data_CM/CM_t1.nii',...% white matter segmentation probability map
+    './data_CM/');% where you want to safe the file
+% hull is not very nice, because segmentation is not so nice
+
+% if using freesurfer output: 
+% gray and white are generally in the same file, so just select the whole thing twice
+get_mask_V2('name',... % subject name
+    './data_freesurfer/name_t1_class_electrodes.nii',... % gray matter file
+    './data_freesurfer/name_t1_class_electrodes.nii',... % white matter file
+    './data_freesurfer/name_t1.nii',... % t1 file
+    './data_freesurfer/',... % where you want to safe the file
+    'r',... % 'l' for left 'r' for right
+    13,0.2); % settings for smoothing and threshold
+
+%% 3) select electrodes from ct
+ctmr
+% view result
+% save image: saves as nifti hdr and img files
+
+%% 4) sort unprojected electrodes
+sortElectrodes;
+% loads img file with electrodes from previous step
+% saves as electrodes_locX;
+
+% electrode 104 is sitting on top of antother, after assigning numbers,
+% change into NaN:
+
+%% 5) plot electrodes 2 surface
+% electrodes2surf(subject,localnorm index,do not project electrodes closer than 3 mm to surface)
+
+% electrodes2surf(
+    % 1: subject
+    % 2: number of electrodes local norm for projection (0 = whole grid)
+    % 3: 0 = project all electrodes, 1 = only project electrodes > 3 mm
+    %    from surface, 2 = only map to closest point (for strips)
+    % 4: electrode numbers
+    % 5: (optional) electrode matrix.mat (if not given, SPM_select popup)
+    % 6: (optional) surface.img (if not given, SPM_select popup)
+    % 7: (optional) mr.img for same image space with electrode
+    %    positions
+% saves automatically a matrix with projected electrode positions and an image
+% with projected electrodes
+% saves as electrodes_onsurface_filenumber_inputnr2
+
+% 1: for a grid use:
+[out_els,out_els_ind]=electrodes2surf('CM',...
+    5,1,... % use these settings for the grid
+    [1:20],... % electrode numbers from the following file
+    './data/electrodes_loc1.mat',... % file with electrode XYZ coordinates
+    './data/CM_surface1_16_03.img',... % surface to which the electrodes are projected
+    './data/t1_aligned.nii');
+% 2: for a 2xN strip use:
+[out_els,out_els_ind]=electrodes2surf('name',4,1,[1:32],'./data/electrodes_loc1.mat','./data/name_surface1_13_02.img','./data/t1_aligned.nii');
+% 3: for a 1xN strip use (project to closest point on the surface, no direction):
+[out_els,out_els_ind]=electrodes2surf('name',0,2,[1:32],'./data/electrodes_loc1.mat','./data/name_surface1_13_02.img','./data/t1_aligned.nii');
+
+% % if freesurfer:
+% surface_name='./data_freesurfer/name_surface1_13_02.img';
+% t1_name='./data_freesurfer/name_t1.nii';
+% % if spm:
+% % surface_name='./data_spm/name_surface1_16_03.img';
+% % t1_name='./data_spm/name_t1.nii';
+
+% lateral grid:
+[out_els,out_els_ind]=electrodes2surf('name',5,1,[1:64],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% mST 2xN strip (project in direction of norm of electrode + 3 closest others):
+[out_els,out_els_ind]=electrodes2surf('name',4,1,[71:80],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% PST 2xN strip
+[out_els,out_els_ind]=electrodes2surf('name',4,1,[81:90],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% aST 1xN strip (project to closest point on the surface, no direction):
+[out_els,out_els_ind]=electrodes2surf('name',0,2,[65:70],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% OCC 1xN strip
+[out_els,out_els_ind]=electrodes2surf('name',0,2,[91:96],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% pIH 1xN strip
+[out_els,out_els_ind]=electrodes2surf('name',0,2,[97:103],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+% aIH 1xN strip
+[out_els,out_els_ind]=electrodes2surf('name',0,2,[105:112],'./data_freesurfer/electrodes_loc1.mat',surface_name,t1_name);
+
+%% 6) combine electrode files into one and make an image
+%
+subject='name';
+elecmatrix=nan(137,3);
+switch subject
+    case 'name'
+    load('./data/name_electrodesOnsurface1_5.mat'); % Lateral Grid
+    elecmatrix(1:64,:)=out_els;
+    load('./data/name_electrodesOnsurface1_4.mat'); % mST
+    elecmatrix(71:80,:)=out_els;
+    load('./data/name_electrodesOnsurface1_0.mat'); % aST
+    elecmatrix(65:70,:)=out_els;
+    load('./data/name_electrodesOnsurface2_0.mat'); % OCC
+    elecmatrix(91:96,:)=out_els;
+    load('./data/name_electrodesOnsurface3_0.mat'); % pIH (104 excluded)
+    elecmatrix(97:103,:)=out_els;
+    load('./data/name_electrodesOnsurface4_0.mat'); % aIH
+    elecmatrix(105:112,:)=out_els;
+    load('./data/name_electrodesOnsurface2_4.mat'); % PST
+    elecmatrix(81:90,:)=out_els;
+  
+    [output,els,els_ind,outputStruct]=position2reslicedImage(elecmatrix,'./data_freesurfer/name_t1.nii');
+
+    for filenummer=1:100
+        save(['./data_freesurfer/' subject '_electrodes_surface_loc_all' int2str(filenummer) '.mat'],'elecmatrix');
+        outputStruct.fname=['./data_freesurfer/electrodes_surface_all' int2str(filenummer) '.img' ];
+        if ~exist(outputStruct.fname,'file')>0
+            disp(['saving ' outputStruct.fname]);
+            % save the data
+            spm_write_vol(outputStruct,output);
+            break
+        end
+    end
+end
+
+%% 6) generate cortex to render images:
+
+% from SPM
+gen_cortex_click_V1('name',0.3,2,.98); 
+
+% from freesurfer
+gen_cortex_click_V2('name',0.4,[15 3],'r'); 
+
+%% plot electrodes on surface 
+% load cortex
+load(['./data_freesurfer/name_cortex.mat']);
+% load(['./data_spm/name_cortex.mat']);
+% load electrodes on surface
+load(['./data_freesurfer/name_electrodes_surface_loc_all1.mat']);
+
+% plot projected electrodes:
+ctmr_gauss_plot(cortex,[0 0 0],0)
+el_add(elecmatrix,'g',30);
+% or maybe add numbers:
+label_add(elecmatrix);
+% adjust view
+loc_view(90,0)
+
+%% %%%%% Take the following steps for plotting if some electrodes appear 
+% underneath the surface: %%%%%%
+ctmr_gauss_plot(cortex,[0 0 0],0)
+els=elecmatrix;
+v_d=[270,0]; % view direction makes sure electrodes are visible on surface
+a_offset=.1*max(abs(els(:,1)))*[cosd(v_d(1)-90)*cosd(v_d(2)) sind(v_d(1)-90)*cosd(v_d(2)) sind(v_d(2))];
+els=els+repmat(a_offset,size(els,1),1);
+
+loc_view(v_d(1),v_d(2))
+el_add(els,'g',30);
+%loc_light(90,0) %change numbers to address lighting
+
+% to save figure:
+% print('-painters','-r300','-dpng',strcat(['./figures/name_rot270_0_labels']));
+
+%% plot electrodes with sizes (use el_add_sizable.m)
+% load cortex
+load(['./data_freesurfer/name_cortex.mat']);
+% load electrodes on surface
+load(['./data_freesurfer/name_electrodes_surface_loc_all1.mat']);
+
+% plot projected electrodes:
+ctmr_gauss_plot(cortex,[0 0 0],0)
+% scale to absmax
+el_add_sizable(elecmatrix,[1:length(elecmatrix)]-round(length(elecmatrix)/2));
+% or scale to max indicated 
+el_add_sizable(elecmatrix,[1:length(elecmatrix)]-round(length(elecmatrix)/2),40);
+
+loc_view(90,0)
+
+
+
+
+
+

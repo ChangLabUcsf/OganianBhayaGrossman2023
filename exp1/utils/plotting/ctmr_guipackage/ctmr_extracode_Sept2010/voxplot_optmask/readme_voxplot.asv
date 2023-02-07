@@ -1,0 +1,25 @@
+
+
+% set Tthreshold for plotting voxels:
+Tthreshold=4.5;% 
+% distance threshold from surface in mm:
+Dthreshold=8;
+% Optional: you may want to only use the voxels from the t-map that fall
+% within a mask of the gray matter: reslice the mask to the space of
+% the functional scans and set a threshold. You can leave this empty.
+maskThreshold=0.1;
+
+% calculate surface T values
+% [xyz,t_surf] = voxplot_func_gm(Tthreshold,Dthreshold,maskThreshold);
+% or
+[xyz,t_surf] = voxplot_func_gm(Tthreshold,Dthreshold,[]);
+% function will have popups to load the surface, t-map and cortex rendering
+
+% render on image
+ssize=2; % diameter for voxels on rendering
+v='r'; % 'l' or 'r'
+ctmr_vox_plot(xyz,t_surf,ssize,v)
+% function will have popups to load the surface, t-map and cortex rendering
+colorbar
+
+
