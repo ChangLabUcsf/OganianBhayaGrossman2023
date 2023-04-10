@@ -1,10 +1,9 @@
 function [imgall] = loadElecLoc(datapath)
     %% load data
-
     sSIDs = {'S5', 'S4', 'S2', 'S1', 'S7', 'S6', 'S3', 'S8', 'S9'};
-    shems = {'rh',  'rh', 'rh', 'lh', 'lh', 'rh', 'rh', 'lh', 'rh'};
+    shems = {'rh',  'rh', 'rh', 'lh', 'lh', 'rh', 'rh', 'lh', 'lh'};
     sel={256, 256, 256, 256, 256, 256, 256, 128, 256};
-    sz=[10, 10, 10, 75, 10, 10, 10, 10, 20];
+    sz=[10, 10, 10, 55, 10, 10, 10, 10, 20];
     
     subjects=sSIDs;
     hems = shems;

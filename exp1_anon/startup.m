@@ -1,6 +1,7 @@
 %% startup
 
 addpath(genpath('utils'));
+% Specify the data path for experiment 1
 datapath = '../../data for sharing/exp1/';
 
 bef=20;
