@@ -1,5 +1,5 @@
 %% load synthetic stimulus details
-taskstims = getfield(load('stimdet_vowels_v5.mat'), 'stimdet');
+taskstims = getfield(load(fullfile('util','stimdet_vowels_v5.mat')), 'stimdet');
 %% load dimex stimulus details
 outD.sent = getfield(load(fullfile(stimFolder, 'out_sentence_details_dimex_all_loudness.mat')),'sentdet');
 

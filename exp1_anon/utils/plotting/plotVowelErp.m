@@ -22,5 +22,5 @@ function plotVowelErp(Dvow, SID, elect, f, cols, bef)
     desmat.vowelNames = Dvow.vowel(vowelCorpusIdx);
 
     resp = Dvow.(SID).resp(:, :, vowelCorpusIdx);
-    ecog_erpPlotSingle(resp, desmat, elect, elect,[], f, bef, [], 1, 100, [], cols);   
+    ecog_erpPlotSingle(resp, desmat, elect, elect, [], f, bef, [], 1, 100, [], cols);   
 end

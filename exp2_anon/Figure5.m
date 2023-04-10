@@ -145,7 +145,7 @@ end
 
 
 %% print ex el figure
-print(fullfile('figures','exeltask.eps'), '-depsc', '-painters')
+%print(fullfile('figures','exeltask.eps'), '-depsc', '-painters')
 %% load  single vowel dimex receptive fields
 cfig = openfig('taskEl_dimexResp.fig');
 for cel = 1:length(exel)

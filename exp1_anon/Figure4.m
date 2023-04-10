@@ -394,7 +394,7 @@ vals = plotAvgImagescResponse(Dvow, elidx, getColors(1), [], ...
     rescale(max([elidx.sr_f1, elidx.sr_f2], [], 2)));
 title('F1-/F2+');
 set(gca, 'FontSize', 15);
-caxis([-0.05 0.65])
+caxis([-0.0 0.45])
 % cmap = brewermap(256, 'PuOr'); 
 % colormap([1 1 1; flipud(cmap(40:240, :))]);
 box off;
@@ -402,7 +402,7 @@ yticks([]);
 xticks([]);
 xlim([800, 3000]);
 ylim([200 800]);
-brighten(0.2);
+brighten(0.1);
 
 subplot(2, 2, 2);
 scatter(elidx.sr_f1, elidx.sr_f2, 55, 'k', 'filled');
@@ -528,8 +528,6 @@ load('out_elecs_voweltypeftest_bychan_anon.mat')
 
 clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
     inflections* formant *model
-
-
 
 %% ------------------------ Functions -------------------------------------
 

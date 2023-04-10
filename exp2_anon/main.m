@@ -1,5 +1,5 @@
 %% setup task
-
+% adjust paths to data, code, util folder in this script.
 setup_task
 
 %% load data

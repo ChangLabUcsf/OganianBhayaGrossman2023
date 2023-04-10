@@ -206,79 +206,80 @@ for s = SIDs
     strfs = loadMultModelStrf(SID, modelname, 'dimex', datapath, 1, '');
 end 
 
-[stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
-    [datapath '/pt_data']);
-
-varnames = {'SID', 'el', 'speech', 'stg'};
-subelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-speechelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-for s = SIDs
-    SID = s{1};
-    sids = repmat(str2double(SID(2:end)), length(allidx_vowel.(SID)), 1);
-    t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
-        allidx_speech.(SID)), ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
-        'VariableNames', varnames);
-    subelecs = [subelecs; t2];
-    
-    sids = repmat(str2double(SID(2:end)), length(allidx_speech.(SID)), 1);
-    t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
-        allidx.(SID)), ismember(allidx_speech.(SID), stgelecs.(SID)), ...
-        'VariableNames', varnames);
-    speechelecs = [speechelecs; t2];
-    clear t2
-end
-clear t2 s
-
-disp('----------------- Subject Stats -------------------------')
-disp(['Total vowel electrodes: ' num2str(height(subelecs))]);
-disp(['Total subj: ' num2str(length(unique(subelecs.SID)))]);
-disp(['Min vowel electrodes per subj: ' num2str(min(crosstab(subelecs.SID)))]);
-disp(['Max vowel electrodes per subj: ' num2str(max(crosstab(subelecs.SID)))]);
-disp(['Median vowel electrodes per subj: ' num2str(median(crosstab(subelecs.SID)))]);
-disp('------------- Speech Stats -------------')
-disp(['Total speech responsive: ' num2str(height(speechelecs))]);
-disp(['Total speech responsive on STG: ' num2str(sum(speechelecs.stg))]);
-disp(['Count vowel responsive: ' num2str(height(subelecs))]);
-disp(['Count vowel responsive on STG: ' num2str(sum(subelecs.stg))]);
-
-tmp = linspace(6.5, 30, numbins-2);
-edges = [0 tmp 400];
-for s=1:length(SIDs)
-    SID = SIDs{s};
-    if isfield(betaInfo, SID) && ~isempty(betaInfo.(SID).els)
-        conds = discretize(fvals.(SID), edges); 
-        conds(1, conds>1) = conds(1, conds>1)+1;
-        
-        % the second condition corresponds to speech responsive electrodes
-        conds(1, intersect(find(conds==1),allidx_speech.(SID))) = 2;
-        desel.(SID).elid = 1:length(fvals.(SID));
-        desel.(SID).condition=conds;
-    end        
-end
-
-for k = elecs.keys()
-    % selected electrodes
-    key = k{1};
-    desel.(key).selid = elecs(key);
-end
-
-% for single subject
-desel.sz = [5, 5, repmat(55, 1, numbins)];
-desel.cols = [ 0 0 0; 0 0 0 ; brewermap(numbins, 'YlGn')];
-[~] = plotNativeElec({'S1'}, desel, [datapath '/pt_data']);
-% print(fullfile('S1_vowel.jpg'), '-djpeg', '-painters', '-r600')
-set(gcf,'Color','w');
-set(gcf, 'InvertHardcopy', 'off');
-
-% for the colorbar
-figure;
-colormap(desel.cols(2:end, :))
-h=colorbar;
-set(gca,'ColorScale','log');
-caxis([edges(2) edges(end-1)]);
-ylabel(h, 'Vowel F-stat');
-set(gca, 'FontSize', 15);
-set(h,'XTick',[5 30]);
+% UNCOMMENT WHEN ACCESS TO EXAMPLE NATIVE BRAIN IS GRANTED
+% [stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
+%     [datapath '/pt_data']);
+% 
+% varnames = {'SID', 'el', 'speech', 'stg'};
+% subelecs = array2table(zeros(0,4), 'VariableNames', varnames);
+% speechelecs = array2table(zeros(0,4), 'VariableNames', varnames);
+% for s = SIDs
+%     SID = s{1};
+%     sids = repmat(str2double(SID(2:end)), length(allidx_vowel.(SID)), 1);
+%     t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
+%         allidx_speech.(SID)), ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
+%         'VariableNames', varnames);
+%     subelecs = [subelecs; t2];
+%     
+%     sids = repmat(str2double(SID(2:end)), length(allidx_speech.(SID)), 1);
+%     t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
+%         allidx.(SID)), ismember(allidx_speech.(SID), stgelecs.(SID)), ...
+%         'VariableNames', varnames);
+%     speechelecs = [speechelecs; t2];
+%     clear t2
+% end
+% clear t2 s
+% 
+% disp('----------------- Subject Stats -------------------------')
+% disp(['Total vowel electrodes: ' num2str(height(subelecs))]);
+% disp(['Total subj: ' num2str(length(unique(subelecs.SID)))]);
+% disp(['Min vowel electrodes per subj: ' num2str(min(crosstab(subelecs.SID)))]);
+% disp(['Max vowel electrodes per subj: ' num2str(max(crosstab(subelecs.SID)))]);
+% disp(['Median vowel electrodes per subj: ' num2str(median(crosstab(subelecs.SID)))]);
+% disp('------------- Speech Stats -------------')
+% disp(['Total speech responsive: ' num2str(height(speechelecs))]);
+% disp(['Total speech responsive on STG: ' num2str(sum(speechelecs.stg))]);
+% disp(['Count vowel responsive: ' num2str(height(subelecs))]);
+% disp(['Count vowel responsive on STG: ' num2str(sum(subelecs.stg))]);
+% 
+% tmp = linspace(6.5, 30, numbins-2);
+% edges = [0 tmp 400];
+% for s=1:length(SIDs)
+%     SID = SIDs{s};
+%     if isfield(betaInfo, SID) && ~isempty(betaInfo.(SID).els)
+%         conds = discretize(fvals.(SID), edges); 
+%         conds(1, conds>1) = conds(1, conds>1)+1;
+%         
+%         % the second condition corresponds to speech responsive electrodes
+%         conds(1, intersect(find(conds==1),allidx_speech.(SID))) = 2;
+%         desel.(SID).elid = 1:length(fvals.(SID));
+%         desel.(SID).condition=conds;
+%     end        
+% end
+% 
+% for k = elecs.keys()
+%     % selected electrodes
+%     key = k{1};
+%     desel.(key).selid = elecs(key);
+% end
+% 
+% % for single subject
+% desel.sz = [5, 5, repmat(55, 1, numbins)];
+% desel.cols = [ 0 0 0; 0 0 0 ; brewermap(numbins, 'YlGn')];
+% [~] = plotNativeElec({'S1'}, desel, [datapath '/pt_data']);
+% % print(fullfile('S1_vowel.jpg'), '-djpeg', '-painters', '-r600')
+% set(gcf,'Color','w');
+% set(gcf, 'InvertHardcopy', 'off');
+% 
+% % for the colorbar
+% figure;
+% colormap(desel.cols(2:end, :))
+% h=colorbar;
+% set(gca,'ColorScale','log');
+% caxis([edges(2) edges(end-1)]);
+% ylabel(h, 'Vowel F-stat');
+% set(gca, 'FontSize', 15);
+% set(h,'XTick',[5 30]);
 
 
 clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
@@ -306,8 +307,10 @@ typeinfo.modelname = {'onset_maxDtL_maxDtLOnset_vowelOnset_F0_audF1F2'};
 typeinfo.modelname = {'onset_maxDtL_maxDtLOnset_vowelOnset'}; %_vowelOnset_F0
 [~, rsqs_subform] = getElecs(Dvow, SIDs, 'dimex', 'strfrsq', typeinfo, ...
     [datapath '/pt_data']);
-[stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
-    [datapath '/pt_data']);
+%       UNCOMMENT WHEN ACCESS TO EXAMPLE NATIVE BRAIN IS GRANTED
+% [stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
+%     [datapath '/pt_data']);
+
 load('out_elecs_voweltypeftest_bychan_anon.mat', 'fvals', 'allidx');
 
 figure('Position', [100 800 300 300], 'Renderer', 'Painters'); 
@@ -317,13 +320,16 @@ for s = SIDs
     SID = s{1};
     if isfield(rsqs_subform, SID)
         %cols = [0.5 0.8 0.6; 0.8 0.15 0.95];
-        stg = ismember(1:length(fvals.(SID)), stgelecs.(SID));
+
+%       UNCOMMENT WHEN ACCESS TO EXAMPLE NATIVE BRAIN IS GRANTED
+%       stg = ismember(1:length(fvals.(SID)), stgelecs.(SID));
+
         % take the maximum unique variance from each of the three models (F1, F2, F1+F2)
         % to account for single and co-encoding electrodes
         rsq = rsqs.(SID);
         
         selidx = allidx.(SID);
-        idx = stg & fvals.(SID)>0.2 & ~ismember(1:length(fvals.(SID)), selidx);      
+        idx = fvals.(SID)>0.2 & ~ismember(1:length(fvals.(SID)), selidx);  % stg &     
                 
         scatter3(fvals.(SID)(idx), rsq(idx), find(idx), 45, [0.5 0.5 0.5], 'filled', ...
             'MarkerFaceAlpha', 0.7, 'LineWidth', 0.025); hold on;
@@ -429,96 +435,98 @@ clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
 
 %% Figure 1 - SUPP: All subject speech responsive vs. vowel responsive
 
+
+% UNCOMMENT WHEN ACCESS TO EXAMPLE NATIVE BRAIN IS GRANTED
 % initialize design electrode structure
-desel=struct();
-numbins = 30;
-desel.conds = 1:numbins;
-
-load([datapath 'pt_data/out_elecs_speechtypeftest_bychan_dimex_Spanish_anon.mat'], ...
-    'allidx', 'fvals');
-allidx_speech = allidx;
-fvals_speech = fvals;
-
-load('pt_data/out_elecs_voweltypeftest_bychan_anon.mat', 'allidx', 'fvals');
-allidx_vowel = allidx;
-fvals_vowel = fvals;
-
-modelname = {'onset_maxDtL_maxDtLOnset_vowelOnset_aud'};
-for s = SIDs
-    SID = s{1};
-    strfs = loadMultModelStrf(SID, modelname, 'dimex', datapath, 1, '');
-end 
-
-[stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
-    [datapath '/pt_data']);
-
-varnames = {'SID', 'el', 'speech', 'stg'};
-subelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-speechelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-for s = SIDs
-    SID = s{1};
-    sids = repmat(str2double(SID(3:end)), length(allidx_vowel.(SID)), 1);
-    t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
-        allidx_speech.(SID)), ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
-        'VariableNames', varnames);
-    subelecs = [subelecs; t2];
-    
-    sids = repmat(str2double(SID(3:end)), length(allidx_speech.(SID)), 1);
-    t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
-        allidx.(SID)), ismember(allidx_speech.(SID), stgelecs.(SID)), ...
-        'VariableNames', varnames);
-    speechelecs = [speechelecs; t2];
-    clear t2
-end
-clear t2 s
-
-df1 = 5 - 1; % degrees of freedom for numerator
-df2 = length(Dvow.vowel) - 5; % degrees of freedom for denominator
-fthresh = finv(1-0.0001, df1, df2);
-
-tmp = linspace(fthresh, 30, numbins-2);
-edges = [0 tmp 400];
-for s=1:length(SIDs)
-    SID = SIDs{s};
-    if isfield(betaInfo, SID) && ~isempty(betaInfo.(SID).els)
-        conds = discretize(fvals.(SID), edges); 
-        conds(1, conds>1) = conds(1, conds>1)+1;
-        
-        % the second condition corresponds to speech responsive electrodes
-        conds(1, intersect(find(conds==1),allidx_speech.(SID))) = 2;
-        desel.(SID).elid = 1:length(fvals.(SID));
-        desel.(SID).condition=conds;
-    end        
-end
-
-% for single subject
-desel.sz = [5, 25, repmat(55, 1, numbins)];
-desel.cols = [ 0 0 0; 0 0 0 ; brewermap(numbins, 'YlGn')];
-
-for s = SIDs    
-
-    SID = s{1};
-    [~] = plotNativeElec({SID}, desel, [datapath '/pt_data']);
-    
-    set(gcf,'Color','w');
-    set(gcf, 'InvertHardcopy', 'off');
-    title(SID);
-
-    axes('Position',[.1 .1 .3 .3])
-    p = pie([sum(desel.(SID).condition>2), sum(desel.(SID).condition==2)], [1 1]); 
-    p(1).FaceColor = desel.cols(20, :);
-    p(1).EdgeColor = 'none';
-    p(3).FaceColor = [0.6 0.6 0.6];
-    p(3).EdgeColor = 'none';
-    p(2).FontSize=13; p(2).FontWeight = 'bold';
-    p(4).FontSize=13; p(4).FontWeight = 'bold';
-
-    %print(fullfile(['supp/' SID '_vowel.jpg']), '-djpeg', '-painters', '-r600')
-end
-
-
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
-    inflections formant *model desel
+% desel=struct();
+% numbins = 30;
+% desel.conds = 1:numbins;
+% 
+% load([datapath 'pt_data/out_elecs_speechtypeftest_bychan_dimex_Spanish_anon.mat'], ...
+%     'allidx', 'fvals');
+% allidx_speech = allidx;
+% fvals_speech = fvals;
+% 
+% load('pt_data/out_elecs_voweltypeftest_bychan_anon.mat', 'allidx', 'fvals');
+% allidx_vowel = allidx;
+% fvals_vowel = fvals;
+% 
+% modelname = {'onset_maxDtL_maxDtLOnset_vowelOnset_aud'};
+% for s = SIDs
+%     SID = s{1};
+%     strfs = loadMultModelStrf(SID, modelname, 'dimex', datapath, 1, '');
+% end 
+% 
+% [stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
+%     [datapath '/pt_data']);
+% 
+% varnames = {'SID', 'el', 'speech', 'stg'};
+% subelecs = array2table(zeros(0,4), 'VariableNames', varnames);
+% speechelecs = array2table(zeros(0,4), 'VariableNames', varnames);
+% for s = SIDs
+%     SID = s{1};
+%     sids = repmat(str2double(SID(3:end)), length(allidx_vowel.(SID)), 1);
+%     t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
+%         allidx_speech.(SID)), ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
+%         'VariableNames', varnames);
+%     subelecs = [subelecs; t2];
+%     
+%     sids = repmat(str2double(SID(3:end)), length(allidx_speech.(SID)), 1);
+%     t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
+%         allidx.(SID)), ismember(allidx_speech.(SID), stgelecs.(SID)), ...
+%         'VariableNames', varnames);
+%     speechelecs = [speechelecs; t2];
+%     clear t2
+% end
+% clear t2 s
+% 
+% df1 = 5 - 1; % degrees of freedom for numerator
+% df2 = length(Dvow.vowel) - 5; % degrees of freedom for denominator
+% fthresh = finv(1-0.0001, df1, df2);
+% 
+% tmp = linspace(fthresh, 30, numbins-2);
+% edges = [0 tmp 400];
+% for s=1:length(SIDs)
+%     SID = SIDs{s};
+%     if isfield(betaInfo, SID) && ~isempty(betaInfo.(SID).els)
+%         conds = discretize(fvals.(SID), edges); 
+%         conds(1, conds>1) = conds(1, conds>1)+1;
+%         
+%         % the second condition corresponds to speech responsive electrodes
+%         conds(1, intersect(find(conds==1),allidx_speech.(SID))) = 2;
+%         desel.(SID).elid = 1:length(fvals.(SID));
+%         desel.(SID).condition=conds;
+%     end        
+% end
+% 
+% % for single subject
+% desel.sz = [5, 25, repmat(55, 1, numbins)];
+% desel.cols = [ 0 0 0; 0 0 0 ; brewermap(numbins, 'YlGn')];
+% 
+% for s = SIDs    
+% 
+%     SID = s{1};
+%     [~] = plotNativeElec({SID}, desel, [datapath '/pt_data']);
+%     
+%     set(gcf,'Color','w');
+%     set(gcf, 'InvertHardcopy', 'off');
+%     title(SID);
+% 
+%     axes('Position',[.1 .1 .3 .3])
+%     p = pie([sum(desel.(SID).condition>2), sum(desel.(SID).condition==2)], [1 1]); 
+%     p(1).FaceColor = desel.cols(20, :);
+%     p(1).EdgeColor = 'none';
+%     p(3).FaceColor = [0.6 0.6 0.6];
+%     p(3).EdgeColor = 'none';
+%     p(2).FontSize=13; p(2).FontWeight = 'bold';
+%     p(4).FontSize=13; p(4).FontWeight = 'bold';
+% 
+%     %print(fullfile(['supp/' SID '_vowel.jpg']), '-djpeg', '-painters', '-r600')
+% end
+% 
+% 
+% clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+%     inflections formant *model desel
 
 
 %% Figure 1 - SUPP: Methods Pipeline
@@ -641,60 +649,4 @@ set(gca, 'FontSize', 13)
 
 clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* inflections ...
     formant *model desel
-
-%% Figure 1 - SUPP: Unique Variance for F1 and F2
-
-width = 300;
-height = 300;
-figure('Position', [100 800 width height]);
-
-modelnames={'onset_maxDtL_maxDtLOnset_vowelOnset_F0_audF1', ...
-    'onset_maxDtL_maxDtLOnset_vowelOnset_F0_audF2', ...
-    'onset_maxDtL_maxDtLOnset_vowelOnset_F0_audF1F2', ...
-    'onset_maxDtL_maxDtLOnset_vowelOnset_F0_aud', ...
-    'onset_maxDtL_maxDtLOnset_vowelOnset_F0'};
-
-load([datapath '/pt_data/out_elecs_voweltypeftest_bychan_anon.mat'], ...
-    'allidx', 'fvals');
-for s = SIDs
-    SID = s{1};    
-    corpusStrf=loadMultModelStrf(SID, modelnames, 'dimex', ...
-        [datapath '/pt_data'], 1, '');
-
-    idx = allidx.(SID);
-    if ~any(cellfun(@(x) isempty(x), corpusStrf))
-        univ_f1 = corpusStrf{3}.meanTestR.^2 -  corpusStrf{1}.meanTestR.^2;
-        univ_f2 = corpusStrf{3}.meanTestR.^2 -  corpusStrf{2}.meanTestR.^2;
-        %color = corpusStrf{3}.meanTestR.^2;
-        color = fvals.(SID);
-        disp(['added elecs: ' num2str(length(univ_f1(idx)))]);
-
-        scatter(univ_f1(idx), univ_f2(idx), 55, color(idx), 'filled', ...
-            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'k'); 
-        set(gca,'ColorScale','log');
-        colormap(flipud(brewermap(64, 'Spectral')))
-        hold on;
-    else
-        warning(['Did not include SID: ' SID]);
-    end
-end
-
-xline(0, '-k');
-yline(0, '-k');
-
-ylabel('F2 bins unique variance');
-ylim([-0.1 0.1])
-yticks(-0.1:0.1:0.2)
-xlabel('F1 bins unique variance');
-xlim([-0.1 0.1])
-xticks(-0.1:0.1:0.2)
-cbh = colorbar;
-
-ylabel(cbh, 'Vowel F-Stat');
-caxis([5 60])
-set(gca, 'FontSize', 13);
-
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* inflections ...
-    formant *model desel
-
 
