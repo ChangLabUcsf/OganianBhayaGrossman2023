@@ -210,36 +210,37 @@ end
 % [stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
 %     [datapath '/pt_data']);
 % 
-% varnames = {'SID', 'el', 'speech', 'stg'};
-% subelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-% speechelecs = array2table(zeros(0,4), 'VariableNames', varnames);
-% for s = SIDs
-%     SID = s{1};
-%     sids = repmat(str2double(SID(2:end)), length(allidx_vowel.(SID)), 1);
-%     t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
-%         allidx_speech.(SID)), ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
-%         'VariableNames', varnames);
-%     subelecs = [subelecs; t2];
-%     
-%     sids = repmat(str2double(SID(2:end)), length(allidx_speech.(SID)), 1);
-%     t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
-%         allidx.(SID)), ismember(allidx_speech.(SID), stgelecs.(SID)), ...
-%         'VariableNames', varnames);
-%     speechelecs = [speechelecs; t2];
-%     clear t2
-% end
-% clear t2 s
-% 
-% disp('----------------- Subject Stats -------------------------')
-% disp(['Total vowel electrodes: ' num2str(height(subelecs))]);
-% disp(['Total subj: ' num2str(length(unique(subelecs.SID)))]);
-% disp(['Min vowel electrodes per subj: ' num2str(min(crosstab(subelecs.SID)))]);
-% disp(['Max vowel electrodes per subj: ' num2str(max(crosstab(subelecs.SID)))]);
-% disp(['Median vowel electrodes per subj: ' num2str(median(crosstab(subelecs.SID)))]);
-% disp('------------- Speech Stats -------------')
-% disp(['Total speech responsive: ' num2str(height(speechelecs))]);
+varnames = {'SID', 'el', 'speech'}; % , 'stg'
+subelecs = array2table(zeros(0,length(varnames)), 'VariableNames', varnames);
+speechelecs = array2table(zeros(0,length(varnames)), 'VariableNames', varnames);
+for s = SIDs
+    SID = s{1};
+    sids = repmat(str2double(SID(2:end)), length(allidx_vowel.(SID)), 1);
+    t2 = table(sids, allidx_vowel.(SID)', ismember(allidx_vowel.(SID)', ...
+        allidx_speech.(SID)), ... %, ismember(allidx_vowel.(SID), stgelecs.(SID))', ...
+        'VariableNames', varnames);
+    subelecs = [subelecs; t2];
+    
+    sids = repmat(str2double(SID(2:end)), length(allidx_speech.(SID)), 1);
+    t2 = table(sids, allidx_speech.(SID), ismember(allidx_speech.(SID), ...
+        allidx.(SID)), ... %ismember(allidx_speech.(SID), stgelecs.(SID)), ...
+        'VariableNames', varnames);
+    speechelecs = [speechelecs; t2];
+    clear t2
+end
+clear t2 s
+
+disp('----------------- Subject Stats -------------------------')
+disp(['Total vowel electrodes: ' num2str(height(subelecs))]);
+disp(['Total subj: ' num2str(length(unique(subelecs.SID)))]);
+disp(['Min vowel electrodes per subj: ' num2str(min(crosstab(subelecs.SID)))]);
+disp(['Max vowel electrodes per subj: ' num2str(max(crosstab(subelecs.SID)))]);
+disp(['Median vowel electrodes per subj: ' num2str(median(crosstab(subelecs.SID)))]);
+disp('------------- Speech Stats -------------')
+disp(['Total speech responsive: ' num2str(height(speechelecs))]);
+disp(['Count vowel responsive: ' num2str(height(subelecs))]);
+
 % disp(['Total speech responsive on STG: ' num2str(sum(speechelecs.stg))]);
-% disp(['Count vowel responsive: ' num2str(height(subelecs))]);
 % disp(['Count vowel responsive on STG: ' num2str(sum(subelecs.stg))]);
 % 
 % tmp = linspace(6.5, 30, numbins-2);
@@ -288,10 +289,6 @@ clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
 %% Figure 1 - SUPP: Formant TRF model to vowel responsive
 % run section above before running this section 
 
-elecs = containers.Map;
-elecs('S1') = []; % E1 - E3, ERP electrodes 55 71 118
-% elecs('S7') = 54; % E3, Sigmoid
-
 typeinfo = struct();
 typeinfo.resp = 'resp';
 
@@ -310,6 +307,10 @@ typeinfo.modelname = {'onset_maxDtL_maxDtLOnset_vowelOnset'}; %_vowelOnset_F0
 %       UNCOMMENT WHEN ACCESS TO EXAMPLE NATIVE BRAIN IS GRANTED
 % [stgelecs,~] = getElecs(Dvow, SIDs, 'dimex', 'anatomy', struct(), ...
 %     [datapath '/pt_data']);
+
+load([datapath 'pt_data/out_elecs_speechtypeftest_bychan_dimex_Spanish_anon.mat'], ...
+    'allidx');
+allidx_speech = allidx;
 
 load('out_elecs_voweltypeftest_bychan_anon.mat', 'fvals', 'allidx');
 
@@ -340,14 +341,6 @@ for s = SIDs
         view(2)
         fvals_comp = [fvals_comp fvals.(SID)(selidx)];
         rsq_comp = [rsq_comp rsq(selidx)];
-        
-        if ismember(SID, elecs.keys)
-            for e = elecs(SID)
-                scatter3(fvals.(SID)(e), rsq(e), e, 55, [0.9 0 0], ...
-                    'LineWidth', 1.2, 'MarkerEdgeColor', 'r'); hold on;
-                text(fvals.(SID)(e), rsq(e), [SID ' e:' num2str(e)]);
-            end
-        end
     end
 end
 
@@ -358,11 +351,31 @@ set(gca, 'Xscale', 'log', 'FontSize', 15);
 [r, pval]= corr(fvals_comp',rsq_comp','Type', 'Spearman');
 disp(['Rho: ' num2str(r) ', pval: ' num2str(pval)]);
 
+% setting up the desel structure for MNI plotting
+desel=struct();
+numbins = 30;
+desel.conds = 1:numbins;
+
 desel.sz = [NaN, 3, repmat(55, 1, length(desel.conds))];
 desel.cols = [ 0 0 0; 0 0 0; brewermap(length(desel.conds), 'YlGn')];
 desel.labels = split(num2str(1:length(desel.conds)));
-desel.EC100.selid = [];
-desel.EC214.selid = [];
+desel.S1.selid = [];
+desel.S7.selid = [];
+
+tmp = linspace(6.5, 30, numbins-2);
+edges = [0 tmp 400];
+for s=1:length(SIDs)
+    SID = SIDs{s};
+    if isfield(betaInfo, SID) && ~isempty(betaInfo.(SID).els)
+        conds = discretize(fvals.(SID), edges); 
+        conds(1, conds>1) = conds(1, conds>1)+1;
+        
+        % the second condition corresponds to speech responsive electrodes
+        conds(1, intersect(find(conds==1),allidx_speech.(SID))) = 2;
+        desel.(SID).elid = 1:length(fvals.(SID));
+        desel.(SID).condition=conds;
+    end        
+end
 
 % colored by distance from the diagonal
 pstg_thresh = -6;
@@ -420,11 +433,9 @@ for hemi = 1:2
     title(titles{hemi});
 end
 
-
 disp('--------------- Counts -------------------')
 disp(['LH vowel electrode count: ' num2str(sum(lh_mni.cond>2)) ...
     ' RH count: ' num2str(sum(rh_mni.cond>2))]);
-
 disp('--------------- Stats -------------------')
 [h, p] = kstest2(ys{1}, ys{2});
 disp(['P-value for LH versus RH y-coordinate distribution: ' num2str(p)]);

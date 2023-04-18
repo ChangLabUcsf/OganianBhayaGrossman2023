@@ -1,767 +1,553 @@
 
 % "STARTUP.M" NEEDS TO BE RUN BEFORE THE FOLLOWING CODE
 
-%% --------------------- Speaker Normalization ----------------------------
-infoStruct = {betaInfo, betaInfo_lte170, betaInfo_gt170}; 
-%betaInfo_lt135, betaInfo_gt238};
+%% ------------ Vowel Formant Encoding in Natural Speech ------------------
 
-inflections_f1 = loadF0Infl(1, infoStruct, SIDs);
-inflections_f2 = loadF0Infl(2, infoStruct, SIDs);
+[inflections]=loadInfl(betaInfo, SIDs, 1, Dvow, bef, aft);
 
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
-    inflections* formant *model
+% '', 'gt170', 'lt170'
+pitchSel = ['' '_anon']; 
 
-%% Figure 3 (a, b) - Cross Speaker Formant Variation
+decode_model = ['decode_vowel_Spanish_20-50_allVowel_vowelftestEl-single_r0.15_' pitchSel '.mat'];
+load([datapath '/ecog_decode/' decode_model])
 
-figure('Position', [100 800 2*300 250]);
+neur_model{1} = neur;
+acs_model{1} = acs;
+          
+sids = neur.respidx(:, 1);
+els = neur.respidx(:, 2);
 
-subplot(1, 2, 1);
-% find medoids for separate speaker type
-medoids_gt = plotVariance(Dvow.formantVals(:, Dvow.meanf0>170), ...
-    Dvow.vowel(Dvow.meanf0>170), [], 0, 0);
-medoids_lte = plotVariance(Dvow.formantVals(:, Dvow.meanf0<170), ...
-    Dvow.vowel(Dvow.meanf0<170), [], 0, 0);
+ssids = cellfun(@(x) str2double(x(2:end)), SIDs);
+idx = ismember(sids, ssids);
 
-scatter(medoids_gt(:, 2), medoids_gt(:, 1), 105, ...
-   getColors(1), 'filled'); hold on;
-scatter(medoids_lte(:, 2), medoids_lte(:, 1), 105, ...
-    getColors(1), 'filled', 's');
+neur_model{1}.decode_single = table(sids(idx), els(idx), neur.confMat(idx)', ...
+    'VariableNames',  {'SID', 'el', 'conf'});
 
-% figure style
-set(gca, 'FontSize', 15);
+% for pooled within subj: 'decode_vowel_Spanish_20-50_allVowel_vowelftestEl-subj_r0.15_'
+% only 5 subjects used to maximize overlapping trials
+% for pooled across subjs: 'decode_vowel_Spanish-mini_20-50_allVowel_vowelftestEl_r0.15_'
+decode_model = ['decode_vowel_Spanish-mini2_20-50_allVowel_vowelftestEl_r0.15_' pitchSel '.mat'];
+load([datapath '/ecog_decode/' decode_model])
 
-set(gca, 'XDir', 'reverse',  'YDir', 'reverse');
-xlabel('F2 (kHz)');  ylabel('F1 (kHz)');
-xlim([500 3000]);  ylim([200 900]); 
-xticks(1000:1000:3000); 
-xticklabels(split(num2str(1:1:3)));
+% clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* inflections ...
+%     formant *model 
 
-yticks(200:400:800);
-yticklabels(split(num2str(0.2:0.4:0.8)));
-legend('off');
+% SVM: Run decoding on sub-populations
+% bootstrap reps
+reps = 50;
+neuresp = cell2mat(inflections.resp);
+tps = bef:bef+30;
 
-% formant variation
-subplot(1, 2, 2);
-medoids = plotVariance(Dvow.formantVals,  Dvow.vowel, [], 0, 0);
-med = cell2mat(arrayfun(@(x) medoids(x, 1:2), ...
-    Dvow.vowelType, 'UniformOutput', false)');
-med_lte = cell2mat(arrayfun(@(x) medoids_lte(x, 1:2), ...
-    Dvow.vowelType, 'UniformOutput', false)');
-med_gt = cell2mat(arrayfun(@(x) medoids_gt(x, 1:2), ...
-    Dvow.vowelType, 'UniformOutput', false)');
+% cases where both formants are encoded significantly in rsq
+joint_encoding = inflections.sr_f1>0 & inflections.sr_f2>0;
 
-var = arrayfun(@(x) pdist([Dvow.formantVals(1:2, x)'; med(x, :)]), ...
-    1:size(Dvow.formantVals, 2));
+% decoding single
+% for each electrode, confusion matrix is 5x5xtps 
+decode_single = neur_model{1}.decode_single;
+confSingleNaN = arrayfun(@(x) max(decode_single.conf{x}, [], 3, 'omitnan'), ...
+    1:height(decode_single), 'UniformOutput',false);
+confSingleNaN = cat(3, confSingleNaN{:});
 
-lte_var = arrayfun(@(x) pdist([Dvow.formantVals(1:2, x)'; med_lte(x, :)]), ...
-    find(Dvow.meanf0<170)); 
-gt_var = arrayfun(@(x) pdist([Dvow.formantVals(1:2, x)'; med_gt(x, :)]), ...
-    find(Dvow.meanf0>170)); 
+% find best single electrode per vowel category
+selel = nan(5, 1);
+for v = 1:5
+    % all pairwise accuracies including this pair
+    tmp = [squeeze(confSingleNaN(v, :, :)); squeeze(confSingleNaN(:, v, :))];
+    [~, els] = maxk(mean(tmp, 'omitnan'), 15);
+    els = squeeze(els);
 
-bw = 0.05;
-violin(rmoutliers(var./1000)', 'x', 1:2, 'facecolor', [0.1 0.1 0.1], ...
-    'edgecolor','none', 'bw', bw, 'medc', []); hold on;
-violin(rmoutliers(lte_var./1000)', 'x', 2:3, 'facecolor', [0.4 0.4 0.4], ...
-    'edgecolor','none', 'bw', bw, 'medc', []); hold on;
-violin(rmoutliers(gt_var./1000)', 'x', 3:4, 'facecolor', [0.8 0.8 0.8], ...
-    'edgecolor','none', 'bw', bw, 'medc', []); hold on;
-xticks(1:3);
-xticklabels({'all', 'F0<170', 'F0>170'})
+    ctr = 1;
+    while isnan(selel(v))
+        % find an electrode in inflections and decode single
+        SID = decode_single.SID(els(ctr));    
+        el = decode_single.el(els(ctr));   
 
-% legend({'All', 'Separated by F0'})
-xlim([0 3.5]);
-ylim([-0.1 0.9]);
-set(gca, 'FontSize', 15);
-ylabel({'Distance', 'to Medoid (kHz)'});
-box off;
-
-[~, p] = ttest2(var, lte_var);
-disp(['ttest between variance vs. F0<170Hz variance: ' num2str(p, 3)]);
-if p<0.001
-    sigline([1, 2],'p<.001',0.6);
-end
-
-[~, p] = ttest2(var, gt_var);
-disp(['ttest between variance vs. F0>170Hz variance: ' num2str(p, 3)]);
-if p<0.001
-    sigline([1,3],'p<.001',0.7);
-end
-legend off
-
-
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
-    inflections* formant *model
-
-%% Figure 3 (d, e) - Speaker Normalization Example Electrode 1 
-
-elecs = containers.Map;
-
-% figure electrodes
-elecs('S6') = 33; % 83
-elecs('S1') = 71; % 87
-
-corpus='dimex';
-
-numel = length(cell2mat(values(elecs)));
-figure('Position', [100 800 300*4 2*250]);
-
-subplt = 1;
-for key = keys(elecs)    
-    SID = key{1};
-    Dvow = addtoDD(Dvow, corpus, bef, aft, {SID});
-       
-    for el = elecs(SID)
-        
-        tmpidx = find(betaInfo.(SID).els==el);
-
-        bins = [13 13];
-        ax = subplot(numel, 3, subplt);
-        plotImagescResponse(Dvow, SID, el,  1, ax, getColors(1));    
-        
-        % beta fitting
-        cols = {'b', 'r'};
-        ax=nan(4, 1);
-                
-        for f=1:2            
-            % sigmoid definition
-            fsigm = @(param,xval) ...
-                       param(1)+(param(2)-param(1))./...
-                       (1+10.^((param(3)-xval)*param(4)));
-            
-            linestyle = {'-', '--'};
-            alpha = [0.8, 0.4];
-            ctr = 1; 
-            for i = {betaInfo_gt170, betaInfo_lte170} %{betaInfo_gt170, betaInfo_lte170} % 
-                % plot sigmoid fit and scatter the real betas
-                info = i{1};
-                
-                ax(f) = subplot(numel, 3, subplt + f);
-                x = info.x(f, :); 
-               
-                y_norm = normalize(info.(SID).y(tmpidx, f, :));
-                scatter(betaInfo.x(f, :), squeeze(y_norm), 25, 'k', ...
-                    'filled', 'DisplayName', ['F' num2str(f)], ...
-                    'MarkerFaceAlpha', alpha(ctr)); hold on;
-
-                slope = info.(SID).beta_lin(tmpidx, f, 1);
-                
-                y_sigm = normalize(fsigm(info.(SID).beta_sigm(tmpidx, f, :), x));                
-                h=plot(x, squeeze(y_sigm), [cols{(slope<0)+1} linestyle{ctr}], ...
-                    'HandleVisibility', 'off', 'LineWidth', 2);
-
-                infl = info.(SID).beta_sigm(tmpidx, f, 3);                
-                infl_y = interp1(x(~isnan(x)), y_sigm(~isnan(x)), infl);
-                scatter(infl, infl_y, 135, 'k', 'x');
-                xlim([min(x) max(x)]);
-                ctr = ctr+1;       
-                
-                clear y_sigm ys  
-            end
-            ylim([-2 2]);
-            yticks(-2:2:2);
-            
-            % remove scientific notation
-            ax = ancestor(h, 'axes');
-                                        
-            xs = xticks;
-            xticklabels(split(num2str(xs./1000)));
-            xlabel(['F' num2str(f) ' (kHz)']);
-            if f == 1               
-                ylabel({'Norm. Beta', 'Weights (a.u.)'});
-            end
-            
-            title({['F0>170 R^2: ' num2str(betaInfo_gt170.(SID).rsq(1, tmpidx, f), 2)], ...
-                ['F0<170 R^2: ' num2str(betaInfo_lte170.(SID).rsq(3, tmpidx, f), 2)]}, ...
-                'FontWeight', 'normal');
-            set(gca, 'FontSize', 15);           
+        % find overlap in inflections and decode_single
+        idx = ismember(inflections.SID, SID) & ismember(inflections.el, el);
+        if sum(idx) && ~ismember(find(idx), selel)
+            selel(v) = find(idx);
         end
-        subplt = subplt + 3;    
+        ctr = ctr+1;
     end
+    clear ctr
 end
 
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
-    *model inflections* formant numel subplt
+confMat = cell(reps, 5);
+pconfMat = cell(reps, 5);
+tpsfrmOnset = nan(5, 5);
+   
+incl_vow = {'a', 'e', 'i', 'o', 'u'};
+label = {'F1-/F2+', 'F1+/F2-', 'Joint'};
+betas = {[], [], [], [], []};
 
-%% Figure 3 (f, h) - Speaker Normalization Inflection Point Shifts
+% single electrode decoding
+filename_single = ...
+    'ecog_decode/decode_vowel_Spanish_maxFstattp_allVowel_vowelftestEl-single_.mat';
+% population of electrodes decoding
+filename_pop = ...
+    'ecog_decode/decode_vowel_Spanish_maxFstattp-pca_allVowel_vowelftestEl-both.mat';
 
-fig = figure('Position', [100 800 300*3 1*250], 'Renderer', 'Painters');
-colormap_rsq = brewermap(5, 'YlGn');
+% if the decoding has not yet been run
+if ~exist([datapath filename_single], 'file') 
 
-% average acoustic difference between two speaker groups
-acs_diff = mean(Dvow.formantVals(:, Dvow.meanf0>170), 2) - ...
-    mean(Dvow.formantVals(:, Dvow.meanf0<170), 2);
-
-rsqth = 0.1;
-infls = {inflections_f1, inflections_f2};
-for formant = 1:2
-    ax = subplot(1, 2, formant);
-    
-    switch formant
-        case 1
-            range = 0.2:0.2:0.8;
-            lims = [0.2 0.75];
-        case 2
-            range = 1:0.5:2.5;
-            lims = [0.7 2.5];
-    end
-    
-    inflections = infls{formant};    
-    idx = inflections.sr_lte170>rsqth & inflections.sr_gt170>rsqth & ...
-        inrange(inflections.infl_lte170./1000, lims) & ...
-        inrange(inflections.infl_gt170./1000, lims);
-    
-    % 2D colormap
-    numColors = 21;
-    [cm2d] = ecog_2dcm(round(numColors/2), [1 1 1; 0 1 1 ; 1 1 1; 1 1 0]);
-      
-    edges = linspace(0, 1, numColors);
-    [col1, ~] = discretize(inflections.sr_lte170(idx), edges);
-    [col2, ~] = discretize(inflections.sr_gt170(idx), edges);
-    color = cell2mat(arrayfun(@(i) squeeze(cm2d(col1(i), col2(i), :)), ...
-        1:sum(idx, 'omitnan'), 'UniformOutput', false))';    
+    figure; 
+    tic
+    for vowel = 1:5   % only run electrodes with best mean performance for this vowel 
         
-    sz = 65; 
-    xticks(-10:10:10);
-    xticklabels(split(num2str(edges(1:10:25))));
-    yticks(-10:10:10);
-    yticklabels(split(num2str(edges(1:10:25))));
-    set(gca, 'FontSize', 13);
-    ylabel('F0 > 170 Hz R^2');
-    xlabel('F0 < 170 Hz R^2');
+        X = inflections.resp{selel(vowel)}(1, tps, :);
+        [confMat(:, vowel), pconfMat(:, vowel), beta, wind, nanel, ~, classes] = ...
+            decode_permute(X, Dvow.vowelType, Dvow.vowel, [], reps, 0); 
+        betas(vowel) = {beta};
+        tpsfrmOnset(vowel, :) = wind;
     
-    set(0, 'CurrentFigure', fig);
-    z = inflections.el(idx);%SID(idx);
-    scatter3(inflections.infl_gt170(idx)./1000, inflections.infl_lte170(idx)./1000, z, ...
-        sz, color, 'filled', 'MarkerFaceAlpha', 0.9, 'MarkerEdgeColor', 'k'); 
+        % visualization
+        subplot(1, 5, vowel);
+        for i = 1:10 
+            r = rand(reps, 1);
+            a = cell2mat(confMat(:, vowel)); 
+            hold on; 
+            scatter(r/4+i, a(:, i), 55, 'filled'); 
+            b = cell2mat(pconfMat(:, vowel)); 
+            scatter(r/4+i, b(:, i), 55, [0.6 0.6 0.6], 'filled', ...
+                'MarkerFaceAlpha', 0.3);           
+        end
+        xticks(1:10);
+        yline(0.5);
+        xticklabels(arrayfun(@(x) strjoin(classes{x}, '-'), 1:10, ...
+            'UniformOutput', false));
+        title(incl_vow{vowel});
+    end
+    toc
+    save([datapath filename_single], ...
+        'selel', 'confMat', 'pconfMat', 'betas',  'tpsfrmOnset');
+    clear selec confMat pconfMat betas tpsfrmOnset
+end
     
-    colormap(ax, colormap_rsq)
-    labels = {'>170', '<=170'};
-    xlabel([labels{1} ' Inflection (kHz)']); 
-    ylabel([labels{2} ' Inflection (kHz)']);
-
-    % figure style
-    view(2); legend('show');
-    legend('off');
+if ~exist([datapath filename_pop], 'file')
+    % decoding subpopulations
+    confMat = cell(reps, 3);
+    pconfMat = cell(reps, 3);
     
-    yticks(range);
-    xticks(range);
-    ylim(lims);
-    xlim(lims);
-
-    % reference lines
-    h=refline(1, 0);
-    h.Color = 'k';
-    h.LineWidth = 2;   
-    h.HandleVisibility='off'; 
-    h=refline(1, -acs_diff(formant)/1000);
-    h.Color = 'k';
-    h.LineStyle = '--'; 
-    h.LineWidth = 1.5;   
-    h.HandleVisibility='off'; 
-    set(gca, 'FontSize', 15);
-    ylim(lims);
-    xlim(lims);
-    grid off
-    title(['n = ' num2str(sum(idx, 'omitnan'))]);
+    % first in  f1-, f1+,, all joint
+    f1_minus = find(joint_encoding & inflections.sl_f1<1 & inflections.sl_f2>0);
+    f1_plus = find(joint_encoding & inflections.sl_f1>0 & inflections.sl_f2<1);
+    elecs = {f1_minus, f1_plus, union(f1_minus,  f1_plus)};
+    
+    betas = {[], [], []};
+    selec = {[], [], []};
+    tpsfrmOnset = nan(3, 5);
+    for cond = 1:3 % conditions: f1+, f1-, all joint
+        tic
+        X = neuresp(elecs{cond}, tps, :);           
+        disp(['Number of electrodes: ' num2str(length(elecs{cond}))])
+    
+        [confMat(:, cond), pconfMat(:, cond), beta, wind, nanel, ...
+            ~, classes] = decode_permute(X, Dvow.vowelType, Dvow.vowel, ...
+            [], reps, 1);% 0.25
+        betas(cond) = {beta};
+        % all time points used per population classifier
+        tpsfrmOnset(cond, :) = wind;
+        selec{cond} = elecs{cond}(~nanel);
+    
+        % visualization
+        figure; 
+        for i = 1:10 
+            r = rand(reps, 1);
+            a = cell2mat(confMat(:, cond)); 
+            hold on; 
+            scatter(r/4+i, a(:, i), 55, 'filled'); 
+            b = cell2mat(pconfMat(:, cond)); 
+            scatter(r/4+i, b(:, i), 55, [0.6 0.6 0.6], 'filled', ...
+                'MarkerFaceAlpha', 0.3);           
+        end
+        xticks(1:10);
+        yline(0.5);
+        xticklabels(arrayfun(@(x) strjoin(classes{x}, '-'), 1:10, ...
+            'UniformOutput', false));
+        title(label{cond})
+        toc
+    end
+    
+    % save out results
+    save([datapath filename_pop], ...
+        'selec', 'confMat', 'pconfMat', 'betas', 'tpsfrmOnset');
+    clear selec confMat pconfMat betas tpsfrmOnset
 end
 
-% Figure 2 - Speaker Normalization over F1 and F2 (Co-occurrence
-infl_f1 = inflections_f1;
-infl_f2 = inflections_f2;
+all_decode = load([datapath filename_pop]);
+single_decode = load([datapath filename_single]);
 
-sr_f1 = infl_f1.('sr_lte170') > rsqth & infl_f1.('sr_gt170') > rsqth;
-sr_f2 = infl_f2.('sr_lte170') > rsqth & infl_f2.('sr_gt170') > rsqth;
-sr = sr_f1 & sr_f2;
+% aggregate all useful information for plotting
+% reps by electrode condition
+acc = nan(10, reps, 4);
+perm_acc = nan(10, reps, 4);
+load('svmClassOrder.mat');
 
-infldiff_f1 = infl_f1.('infl_gt170') - infl_f1.('infl_lte170');
-infldiff_f2 = infl_f2.('infl_gt170') - infl_f2.('infl_lte170');
-
-fig2 = figure('Position', [100 800 300*1 1*250], 'Renderer', 'Painters');
-set(0, 'CurrentFigure', fig2);
-ax = subplot(1, 1, 1);
-z = infl_f1.el; 
-
-numColors = 21;
-[cm2d] = ecog_2dcm(round(numColors/2), [1 1 1; 1 0 0 ; 1 1 1; 0 0 1]);
-edges = linspace(0, 1, numColors);
-
-[col1, edges_lte] = discretize(max([infl_f1.('sr_gt170')(sr) ...
-    infl_f1.('sr_lte170')(sr)], [], 2, 'omitnan'), edges);
-[col2, edges_gt] = discretize(max([infl_f2.('sr_gt170')(sr) ...
-    infl_f2.('sr_lte170')(sr)], [], 2, 'omitnan'), edges);
-color = cell2mat(arrayfun(@(i) squeeze(cm2d(col1(i), col2(i), :)), ...
-    1:sum(sr, 'omitnan'), 'UniformOutput', false))'; 
-
-sz = 75; 
-xticks(-10:10:10);
-xticklabels(split(num2str(edges(1:10:25))));
-yticks(-10:10:10);
-yticklabels(split(num2str(edges(1:10:25))));
-set(gca, 'FontSize', 13);
-ylabel('F2 max R^2');
-xlabel('F1 max R^2');
-
-set(0, 'CurrentFigure', fig2);
-%color = nanmax([infl_f2.('sr_gt170') infl_f2.('sr_gt170')], [], 2);
-idx = infldiff_f1./1000<1 & infldiff_f1./1000>-1 & ...
-    infldiff_f2./1000<3 & infldiff_f1./1000>-3;
-scatter3(infldiff_f1(sr)./1000, infldiff_f2(sr)./1000, z(sr), 65, color, ... %  sz(sr)
-    'filled', 'MarkerFaceAlpha', 0.8); % 'MarkerEdgeColor', 'k'
-
-xlim([-0.2 0.4]);
-ylim([-1.5 2.5]);
-yline(0, '-k', 'LineWidth', 1.2);
-xline(0, '-k', 'LineWidth', 1.2);
-yline(acs_diff(2)/1000, '--k', 'LineWidth', 1.5);
-xline(acs_diff(1)/1000, '--k', 'LineWidth', 1.5);
-xticks(-0.2:0.2:0.4);
-yticks(0:2:2);
-view(2);
-grid off;
-
-set(gca, 'FontSize', 15);
-ylabel({'Infl. Difference', '(F2, kHz)'});
-xlabel({'Infl. Difference', '(F1, kHz)'});
-
-title(['n = ' num2str(sum(sr&idx, 'omitnan'))]);
-
-% Running the statistical models
+% pair by pair by electrode condition (only single electrode and all)
+confAll = nan(5, 5, 2, reps);
 ctr = 1;
-rng = [200 1000; 200 4000];
-for j = {infl_f1, infl_f2}
-    i = j{1};
-    numel = height(i);
-    % el = cellstr(num2str(repmat(inflections_f1.el, 3, 1)));
-    el = repmat(i.el, 2, 1);
-    infl = [i.infl_lte170; i.infl_gt170];
-    pitch = [-1*ones(numel, 1); ones(numel, 1);];
-    rsq = [i.sr_lte170; i.sr_gt170];
-    sid = repmat(i.SID, 2, 1);
-
-    % add speaker normalization regression
-    tbl = table(infl, pitch, rsq, el, sid, ...
-        'VariableNames',{'Infl','Pitch','Rsq','El', 'Subj'});
-    
-    idx = tbl.Infl<rng(ctr, 1) | tbl.Infl>rng(ctr, 2);
-    idx = idx | tbl.Rsq<0.15; 
-    tbl(idx, :) = [];
-    
-    %tbl.Pitch = zscore(tbl.Pitch);
-    tbl.Rsq = zscore(tbl.Rsq); 
-    
-    lme = fitlme(tbl,'Infl~Rsq*Pitch+(1|Subj)+ (1|El:Subj)');
-    disp(['-------------------------F' num2str(ctr) '------------------']);
-    disp(lme);
-    ctr = ctr+1;
-end
-
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
-    inflections* formant *model
-
-%% Figure 3 - SUPP: Marginals for F1 and F2, across and within speaker types
-
-width = 455*2;
-height = 200*2;
-figure('Position', [100 800 width height]);
-
-bm = getColors(1);
-
-lims = {[100 900], [100 3000]};
-
-pitchlabels = {'all', 'lt170', 'gt170'};
-for pitch = 1:3 % 
-    switch pitch
-        case 1
-           trials = Dvow.meanf0 > 0;
-        case 2
-           trials = Dvow.meanf0 < 170;
-        case 3
-           trials = Dvow.meanf0 > 170;
-    end
-    for formant=1:2
-        subplot(2, 3, (formant-1)*3+pitch);
-        for v = 1:5
-            [d1_ac, EDGES] = discretize(Dvow.formantVals(formant, ...
-                Dvow.vowelType == v & trials), 30);
-            plot(EDGES(1:end-1)+diff(EDGES)./2, histcounts(d1_ac), ...
-                'LineWidth', 1.5, 'Color', bm(v, :)); hold on;        
-        end
-        xlim(lims{formant});
-        xlabel(['Formant ' num2str(formant) 'Hz']);
-        if formant<2, title(['pitch group: ' pitchlabels{pitch}]); end
-    end
-end
-legend(unique(Dvow.vowel));
-
-% alternatively, show all five vowels with different pitch marginals
-width = 455*2;
-height = 200*2;
-figure('Position', [100 800 width height]);
-
-lims = {[200 900], [600 3000]};
-ls = {'-', '--', ':'};
-for v = 1:5    
-    for formant=1:2
-        subplot(2, 5, (formant-1)*5+v);
-        for pitch = 1:3 % 'all', 'lt170', 'gt170'
-            switch pitch
-                case 1
-                   trials = Dvow.meanf0 > 0;
-                case 2
-                   trials = Dvow.meanf0 < 170;
-                case 3
-                   trials = Dvow.meanf0 > 170;
-            end
-
-            [d1_ac, EDGES] = discretize(Dvow.formantVals(formant, ...
-                Dvow.vowelType == v & trials), 30);
-            plot(EDGES(1:end-1)+diff(EDGES)./2, histcounts(d1_ac), ...
-                'LineWidth', 1.5, 'Color', bm(v, :), 'LineStyle', ls{pitch}); hold on;        
-        end
-        xlim(lims{formant});
-        xlabel(['Formant ' num2str(formant) 'Hz']);
-    end
-end
-legend({'all', '<170', '>170'});
-
-clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* inflections*...
-    formant *model
-
-
-%% Figure 3 - SUPP: Latency of Normalizing vs. Non-normalizing Electrodes
-
-infls = {inflections_f1, inflections_f2};
-
-column = {'f1', 'f2'};
-hFig=figure('Renderer', 'painters', 'Position', [100 800 350*2 250]); 
-for formant = 1:2 
-    inflections = infls{formant};
-    for s = SIDs
-        SID = s{1};
-
-        corpStrf = loadMultModelStrf(SID, {model}, 'dimex', ...
-            [datapath '/pt_data'], 1);
-        corpStrf = corpStrf{1};
-
-        % find the beginning of the aud feature, assuming all other features
-        % are 1-dimensional
-        strtfeat = find(cellfun(@(x) strcmp(x, 'aud'), corpStrf.featureNames));
-        [~, maxidx] = max(squeeze(mean(corpStrf.meanStrf(strtfeat:end, :, :), ...
-            'omitnan')), [], 'omitnan');
-
-        % only rows where SID is same as current SID
-        subtable = inflections(inflections.SID == str2double(SID(2:end)), :);
-
-        infl_lte = subtable.('infl_lte170');
-        infl_gt = subtable.('infl_gt170');  
-        sr = subtable.('sr_gt170') > 0 & subtable.('sr_lte170') > 0;
-        elecs = subtable(sr, 'el');
-        latency = maxidx(elecs.el);
-        infl_diff = infl_gt(sr) - infl_lte(sr);
+for v1 = 0:4
+    for v2 = v1+1:4
         
-        set(0,'CurrentFigure',hFig)
-        subplot(1, 2, formant);
-        color = max([subtable.('sr_gt170') subtable.('sr_lte170')], [], 2, 'omitnan');
-        scatter(infl_diff, latency*0.01, 45, color(sr), 'filled', ...
-            'MarkerEdgeColor', 'k'); hold on;        
+        % find index of pair
+        pair = find(all([classOrd.classesNum] == [v1; v2]));
+        
+        % scatter/boxplot single electrode best accuracy
+        tmp_acc = cellfun(@(x) x(pair), single_decode.confMat);        
+        [~, elec] = max(mean(tmp_acc, 1));
+        acc(ctr, :, 1) = tmp_acc(:, elec)';
+        confAll(v1+1, v2+1, 1, :) = tmp_acc(:, elec)';  
+        confAll(v2+1, v1+1, 1, :) = tmp_acc(:, elec)';  
+        
+        tmp_pacc = cellfun(@(x) x(pair), single_decode.pconfMat);        
+        perm_acc(ctr, :, 1) = tmp_pacc(:, elec)';
+        clear tmp*
+        
+        % scatter/boxplot subsets/all with accuracy
+        acc(ctr, :, 2:end) = cellfun(@(x) x(pair), all_decode.confMat);                
+        perm_acc(ctr, :, 2:end) = cellfun(@(x) x(pair), all_decode.pconfMat); 
+
+        % use all electrodes (~56) versus the miniset
+        confAll(v1+1, v2+1, 2, :) = acc(ctr, :, 4);
+        confAll(v2+1, v1+1, 2, :) = acc(ctr, :, 4);
+        ctr = ctr+1;
     end   
 end
 
-% formatting
-for formant = 1:2
-    subplot(1, 2, formant);
-    
-    if formant == 1
-        xlim([-500 500]);
-        xticks(-500:500:500)
-    else
-        xlim([-2000 2000]);
-        xticks(-2000:1000:2000)
-    end
-    ylim([0 0.25]);
-    yticks(0:0.1:0.3)
+decode_all.confAll = confAll;
+decode_all.acc = acc;
+decode_all.perm_acc = perm_acc;
+decode_all.class_ord = classOrd;
+decode_all.condition = label;
+decode_all.reps = reps;
+decode_all.single = single_decode;
 
-    colormap(brewermap(30, 'PRGn'));
-    cbh=colorbar;
-    caxis([0 1]);
-    set(cbh,'YTick',0:0.5:1);
-    ylabel(cbh, 'Sigm R^2');
+% copy over
+decode_all.confMat = all_decode.confMat;
+decode_all.selec = all_decode.selec;
+decode_all.betas = all_decode.betas;
+decode_all.tpsfrmOnset = all_decode.tpsfrmOnset;
+clear all_decode
 
-    ylabel('Latency of Peak Response (s)');
-    if i == 1
-        xlabel('Inflection Difference');
+clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+    inflections* formant *model
+
+%% Figure 3 (a 1) - averaged pairwise comparisons
+
+confAll = decode_all.confAll;
+colors = getColors(1);
+reps = decode_all.reps;
+
+figure;
+pairavg = nan(6, 50);
+pairavg(6, :) = mean(cell2mat(decode_all.confMat(:, 3)), 2);
+for v = 1:5
+    % average across all pairs for every rep
+    pairavg(v, :) = mean(cell2mat(decode_all.single.confMat(:, v)), 2);
+    boxchart(ones(50, 1)*v, squeeze(pairavg(v, :))', 'MarkerColor', ...
+        'none', 'LineWidth', 0.5, ...
+        'BoxFaceColor',colors(v, :)); hold on;
+
+    [~, p] = ttest2(pairavg(6, :), pairavg(v, :));
+    med_diff = (median(pairavg(6, :))-median(pairavg(v, :)))*100;
+    disp(['Median difference: ' num2str(med_diff) ', pval: ' num2str(p)]);
+end
+
+boxchart(ones(50, 1)*7, pairavg(6, :)', 'MarkerColor', 'none', ...
+    'LineWidth', 0.5, 'BoxFaceColor',[0.1 0.1 0.1]); hold on;
+
+% permutation baseline
+pacc = [cellfun(@(x) mean(x), decode_all.single.pconfMat),...
+    mean(decode_all.perm_acc(:, :, 4), 1)'];
+pacc_tmp = [pacc(:, 1), pacc,  pacc(:, 6)];
+shadedErrorBar(0.5:7.5, mean(pacc_tmp), std(pacc_tmp), ...
+    'patchSaturation', 0.02);
+
+set(gca, 'FontSize', 15);
+xlim([0 8]);
+xticks([1:5 7])
+xticklabels({'E1', 'E2', 'E3', 'E4', 'E5', 'all'});
+yticks([0.5, 0.7]);
+yticklabels({'50', '70'});
+ylabel('% correct across pairs');
+
+% stats on single versus population
+confAllNan = confAll;
+for p = 1:reps
+    for r = 1:5
+        for c = r+1:5
+            confAllNan(c, r, :, p) = NaN;
+        end
     end
+end
+pairs = reshape(confAllNan, [5*5, 2, reps]);
+pairs(isnan(pairs(:, 1, 1)), :, :) = [];
+
+p = nan(10, 1);
+for i = 1:10
+    [~, p(i)] = ttest2(squeeze(pairs(i, 1, :))', squeeze(pairs(i, 2, :))');
+end
+disp(['Pairs at p<.0001 = ' num2str(sum(p<0.0001)) '/10']);
+[p, ~, stats] = ranksum(reshape((mean(pairs(:, 2, :), 3)), [], 1), ...
+    reshape((mean(pairs(:, 1, :), 3)), [], 1));
+disp(['All pair p = ' num2str(p) ' ']);
+
+clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+    inflections* formant *model
+
+
+%% Figure 3 (a 2) - ERPs for selected single electrode decoding 
+fig = figure('Position',[0 100 200 800]);
+incl_vow = {'a', 'e', 'i', 'o', 'u'};
+els = decode_all.single.selel; % 
+for ctr = 1:5  
+
+    SID = ['S' num2str(inflections.SID(els(ctr)))];
+    elec = inflections.el(els(ctr));
+
+    Dvow = addtoDD(Dvow, 'dimex', bef, aft, {SID});
+   
+    subplot(5, 1, ctr)
+
+    plotVowelErp(Dvow, SID, elec, fig, getColors(1), bef./100);
+    ylabel('HGA (norm)');
+    xlabel('Time (s)');
     set(gca, 'FontSize', 15);
-
-    h=xline(0);
-    h.Color = 'k';
+    yticks(-0.5:0.5:1); 
+    title(incl_vow(ctr));
 end
 
 clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
     inflections* formant *model
 
-%% Figure 3 - SUPP: Inflection Location as Speaker Mean Pitch Increases 
+%% Figure 3 (c) - pairwise decoding comparisons
 
-% order is infl, infl_lte, infl_gt
-infoStruct = {betaInfo_lt135, betaInfo_bt135_200, betaInfo_bt200_236}; %, betaInfo_lte170, betaInfo_gt170,
-pitchStr = {'<135 Hz', '135-200 Hz', '200-236 Hz'};
-xlin = [135, 200, 236];
-%infoStruct = {betaInfo_lt135, betaInfo_bt135_238, betaInfo_gt170};
+load('svmClassOrder.mat');
+ord = [classOrd.classesNum];
 
-thresh = 0.05;
-inflections_f1 = loadF0Infl(1, infoStruct, SIDs);
-inflections_f2 = loadF0Infl(2, infoStruct, SIDs);
-infls = {inflections_f1, inflections_f2};
+% summary with accuracy
+acc = decode_all.acc;
+pacc = decode_all.perm_acc;
 
 figure;
-h1 = subplot(2, 2, 1);
-h2 = subplot(2, 2, 2);
-sbs = [h1, h2];
-
-% scatter of inflection points per group
-for f = 1:2 
-    set(gcf,'CurrentAxes', sbs(f));
-    
-    % boxplot
-    infl = infls{f};
-    idx = infl.sr>thresh & infl.sr_lte170>thresh & ...
-        infl.sr_gt170>thresh;
-
-    id1 = infl.sr>thresh; % significant in first speaker subset
-    id2 = infl.sr_lte170>thresh; % significant in second speaker subset
-    id3 = infl.sr_gt170>thresh; % significant in third speaker subset
-    disp(['---------------------- F' num2str(f) ' ----------------------']);
-    disp(['sigmoid rsq (lt, btb, gt) over 0.5: ' num2str(sum(id1, 'omitnan')) ', ' ...
-        num2str(sum(id2, 'omitnan')) ', ' num2str(sum(id3, 'omitnan'))]);
-    disp(['intersect: ' num2str(sum(all([id1, id2, id3], 2), 'omitnan'))]);
-    disp(['numel: ' num2str(sum(idx, 'omitnan'))])
-    
-    % Not useful, better to use pitch as different stepwise predictors (1, 2, 3)
-%     disp(['-------------------- F' num2str(f) ' ftest --------------------']);
-%     [~,p1] = ttest2(infl.infl(idx), infl.infl_lte170(idx));
-%     [~,p2] = ttest2(infl.infl_lte170(idx), infl.infl_gt170(idx));
-%     [~,p3] = ttest2(infl.infl(idx), infl.infl_gt170(idx));
-%     disp(['pair (1, 2): ' num2str(p1)])
-%     disp(['pair (2, 3): ' num2str(p2)])
-%     disp(['pair (1, 3): ' num2str(p3)])    
-
-    boxplot(sbs(f), [infl.infl(idx) infl.infl_lte170(idx) infl.infl_gt170(idx)], ...
-        'symbol','');
-    set(findobj(gca,'type','line'),'linew',0.8, 'color', 'r'); hold on;
-    
-    %  overlaid on scatter
-    for i = 1:height(inflections_f1)  
-        infl = infls{f};
-        if idx(i) % only plot if part of barplot
-            y = [infl.infl(i) infl.infl_lte170(i) infl.infl_gt170(i)];
-            alpha = [infl.sr(i) infl.sr_lte170(i) infl.sr_gt170(i)];
-            alpha(alpha<0 | isnan(alpha)) = 0;
-            r = nan(3, 1);
-            for x = 1:3   
-                r(x) = rand;
-                scatter(x-0.1+r(x)*0.2, y(x), 35, 'k', 'filled', 'MarkerFaceAlpha', ...
-                    alpha(x)); hold on;        
-            end
-    %         if min(alpha)>0.8
-    %             lh = plot(h,[1:3]'-0.1+r*0.2, y, 'LineWidth', min(alpha)); hold on;
-    %             lh.Color=[0,0,0,2*min(alpha)-1];
-    %         end    
-        end
-    end
-    
-    % figure style    
-    xlim([0.6 3.4]);
-    xticks(1:3);   
-    xticklabels(pitchStr);
-    ylabel(['Infl F' num2str(f) ' (Hz)']);
-    set(gca, 'FontSize', 15);
-    switch f
-        case 1
-            yticks(200:200:1000);
-            ylim([300 700]);
-        case 2
-            yticks(1000:1000:3000)
-            ylim([800 3000]);            
-    end
-    box off;
-end
-
-subplot(2, 2, [3 4]);
-histogram(Dvow.meanf0, 'EdgeColor', 'none', 'FaceAlpha', 0.5, ...
-    'FaceColor', [0.5 0.5 0.5]);
-xline(xlin, 'LineWidth', 3, 'Color', 'r');
-
-% pairwise difference
-% figure;
-% h1 = subplot(1, 2, 1);
-% h2 = subplot(1, 2, 2);
-% sbs = [h1, h2];
-% for f = 1:2
-%     set(gcf,'CurrentAxes', sbs(f));
-%     % boxplot overlaid on scatter
-%     infl = infls{f};
-%     idx = infl.sr>thresh & infl.sr_lte170>thresh & ...
-%         infl.sr_gt170>thresh;
-%     
-%     y = [inflections_f1.infl_lte170(idx) - inflections_f1.infl(idx) ...
-%     inflections_f1.infl_gt170(idx) - inflections_f1.infl_lte170(idx)];
-%     boxplot(y);
-%     
-%     set(findobj(gca,'type','line'),'linew',0.8, 'color', 'r'); hold on;    
-%     yline(0, 'LineStyle', '--', 'Color', 'k');
-%     
-%     switch f
-%         case 1
-%             ylim([-300 300]);
-%         case 2    
-%             ylim([-1500 1500]);
-%     end    
-% end
-
-% single electrode example
-
-% figure electrodes
-elecs = containers.Map;
-%elecs('EC214') = 3;
-
-% example electrpde
-elecs('EC203') = []; %129
-%elecs('EC214') = 69;
-
-corpus='dimex';
-addpath othercolor
-
-numel = length(cell2mat(values(elecs)));
-formant = 2;
-
-subplt = 1;
-for key = keys(elecs)    
-    SID = key{1};
-       
-    for el = elecs(SID)   
-        figure('Position', [100 800 300*4 2*250]);
-        tmpidx = find(betaInfo.(SID).els==el);
-        
-        % beta fitting
-        cols = {'b', 'r'};
-        ax=nan(4, 1);
-            
-        % sigmoid definition
-        fsigm = @(param,xval) ...
-                   param(1)+(param(2)-param(1))./...
-                   (1+10.^((param(3)-xval)*param(4)));
-
-        labels = pitchStr;
-        linestyle = {'-', '--', '-.'};
-        alpha = [0.9, 0.6, 0.3];
-        ctr = 1; 
-        for i = infoStruct
-            % plot sigmoid fit and scatter the real betas
-            info = i{1};
-            x = info.x(formant, :); 
-
-            y_norm = normalize(info.(SID).y(tmpidx, formant, :));
-            scatter(betaInfo.x(formant, :), squeeze(y_norm), 25, 'k', ...
-                'filled', 'MarkerFaceAlpha', alpha(ctr), ...
-                 'HandleVisibility', 'off'); hold on;
-
-            slope = info.(SID).beta_lin(tmpidx, formant, 1);
-
-            y_sigm = normalize(fsigm(info.(SID).beta_sigm(tmpidx, formant, :), x));                
-            h=plot(x, y_sigm, [cols{(slope<0)+1} linestyle{ctr}], ...
-                'LineWidth', 2, 'DisplayName', labels{ctr});
-
-            infl = info.(SID).beta_sigm(tmpidx, formant, 3);                
-            infl_y = interp1(x(~isnan(x)), y_sigm(~isnan(x)), infl);
-            scatter(infl, infl_y, 135, 'k', 'x', 'HandleVisibility', 'off');
-            xlim([min(x) max(x)]);
-            ctr = ctr+1;       
-
-            clear y_sigm ys  
-        end
-        ylim([-2 2]);
-        yticks(-2:2:2);
-
-        xs = xticks;
-        xticklabels(split(num2str(xs./1000)));
-        xlabel(['F' num2str(formant) ' (kHz)']);              
-        ylabel({'Norm. Beta', 'Weights (a.u.)'});
-      
-        set(gca, 'FontSize', 15);           
-        subplt = subplt + 3; 
-    end
-end
-
+% pair by pair by electrode condition (only single electrode and all)
 ctr = 1;
-rng = [100 1000; 100 4000];
-for j = infls
-    i = j{1};
-    numel = height(i);
-    % el = cellstr(num2str(repmat(inflections_f1.el, 3, 1)));
-    el = repmat(i.el, 3, 1);
-    infl = [i.infl; i.infl_lte170; i.infl_gt170];
-    pitch = [-1*ones(numel, 1); 0*ones(numel, 1); ones(numel, 1)];
-    rsq = [i.sr; i.sr_lte170; i.sr_gt170];
-    % add speaker normalization regression
-    tbl = table(infl, pitch, rsq, el, 'VariableNames',{'Infl','Pitch','Rsq','Elec'});
-    
-    idx = tbl.Infl<rng(ctr, 1) | tbl.Infl>rng(ctr, 2);
-    idx = idx | tbl.Rsq<0.15 |isnan(tbl.Infl); 
-    tbl(idx, :) = [];
-    
-    %tbl.Pitch = zscore(tbl.Pitch);
-    tbl.Rsq = zscore(tbl.Rsq);
-    
-    lme = fitlme(tbl,'Infl~Rsq*Pitch+(1+Pitch|Elec)');
-    disp(['-------------------------F' num2str(ctr) '---------------------------']);
-    disp(lme);
+for v1 = 0:4
+    for v2 = v1+1:4
+        subplot(4, 4, gridCount(v1+1, v2, 4, 4));
+        
+        % find index of pair
+        pair = find(all([decode_all.class_ord.classesNum] == [v1; v2]));
+        
+        boxchart(squeeze(acc(pair, :, :)), 'MarkerColor', 'none', 'LineWidth', 0.5); 
+        hold on;
+        
+        pacc_tmp = [squeeze(pacc(pair, :, 1))' squeeze(pacc(pair, :, 1:4)) ...
+            squeeze(pacc(pair, :, 4))'];
+        shadedErrorBar(0:5, mean(pacc_tmp), std(pacc_tmp), ...
+            'patchSaturation', 0.04);
+        
+        plot(mean(squeeze(acc(ctr, :, :)), 'omitnan'), '-k', 'LineWidth', 1.25);
+        xticklabels({'s', '-/+', '+/-', 'b'});
+        
+        % check for significant difference between two subpopulations
+        % F1-/F2+ and F1+/F2-
+        if size(acc, 3)>3
+            [~, p, ~] = ttest2(acc(pair, :, 2), acc(pair, :, 3));
+        else
+            [~, p, ~] = ttest2(acc(pair, :, 1), acc(pair, :, 2));
+        end
+        if p<0.0001 
+            plot([2, 3], [0.75 0.75], '-k');
+            text(2.3, 0.76, 'p<.0001', 'FontSize', 12);
+        end  
+        
+        ylim([0.43 0.81]);
+        xlim(categorical([1 size(acc, 3)]));
+        if ismember(gridCount(v1+1, v2, 4, 4), [1, 6, 11, 16])
+            yticks([0.5, 0.80]);
+            yticklabels({'50', '80'});
+        else
+            yticks([]);
+        end
+
+        if gridCount(v1+1, v2, 4, 4)~=16
+            xticks([]);
+        end
+        title(strjoin(decode_all.class_ord(pair).classes)) 
+        ctr = ctr+1;
+    end
+end
+
+clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+    inflections* formant *model
+
+%% Figure 3 (d) - plot RFs of two electrode subsets
+
+figure; 
+ax(1) = subplot(2, 2, 1);
+
+thresh = 0.015;
+elidx = inflections(inflections.sl_f1<1 & inflections.sl_f2>0 ...
+    & inflections.sr_f1>thresh & inflections.sr_f2>thresh, :);
+disp(['Number of F1-/F2+: ' num2str(height(elidx))]);
+% elidx = inflections(decode_all.selec{1}, :);
+elidx.SID = arrayfun(@(x) ['S' num2str(x)], elidx.SID, ...
+    'UniformOutput', false);
+
+vals = plotAvgImagescResponse(Dvow, elidx, getColors(1), [], ...
+    rescale(max([elidx.sr_f1, elidx.sr_f2], [], 2)));
+title('F1-/F2+');
+set(gca, 'FontSize', 15);
+caxis([-0.0 0.45])
+% cmap = brewermap(256, 'PuOr'); 
+% colormap([1 1 1; flipud(cmap(40:240, :))]);
+box off;
+yticks([]);
+xticks([]);
+xlim([800, 3000]);
+ylim([200 800]);
+brighten(0.1);
+
+subplot(2, 2, 2);
+scatter(elidx.sr_f1, elidx.sr_f2, 55, 'k', 'filled');
+h=refline(1, 0);
+yticks([0 1]);
+xticks([0 1]);
+xlabel('F1 R^2');
+ylabel('F2 R^2');
+set(gca, 'FontSize', 15);
+h.Color = 'k';
+h.LineStyle = '--';
+
+ax(2) = subplot(2, 2, 3);
+% elidx = inflections(decode_all.selec{2}, :);
+elidx = inflections(inflections.sl_f1>0 & inflections.sl_f2<1 ...
+    & inflections.sr_f1>thresh & inflections.sr_f2>thresh, :);
+disp(['Number of F1+/F2-: ' num2str(height(elidx))]);
+elidx.SID = arrayfun(@(x) ['S' num2str(x)], elidx.SID, ...
+    'UniformOutput', false);
+
+vals2 = plotAvgImagescResponse(Dvow, elidx, getColors(1), [], ...
+    rescale(max([elidx.sr_f1, elidx.sr_f2], [], 2)));
+title('F1+/F2-');
+set(gca, 'FontSize', 15);
+caxis([-0.05 0.65]);
+box off;
+yticks([]);
+xticks([]);
+xlim([800, 3000]);
+ylim([200 800]);
+brighten(0.2);
+
+subplot(2, 2, 4);
+scatter(elidx.sr_f1, elidx.sr_f2, 55, 'k', 'filled');
+h=refline(1, 0);
+yticks([0 1]);
+xticks([0 1]);
+xlabel('F1 R^2');
+ylabel('F2 R^2');
+set(gca, 'FontSize', 15);
+h.Color = 'k';
+h.LineStyle = '--';
+
+% marking the difference lines on the graphs
+medoids = plotVariance(Dvow.formantVals, Dvow.vowel, [], 0, 0);
+diffacc = nan(5, 5);
+for v1 = 1:5
+    for v2 = v1+1:5
+        tmp = [abs(triu(vals-vals')) abs(triu(vals2-vals2'))];
+        tmp = tmp(tmp>0);
+
+        subplot(2, 2, 1)
+        width = discretize(abs(diff(vals([v1, v2]))), ...
+            linspace(min(tmp), max(tmp), 8))*0.6;
+        plot([medoids(v1, 2) medoids(v2, 2)], ...
+            [medoids(v1, 1) medoids(v2, 1)], 'Color', 'k', ...
+            'LineWidth', width);
+
+        subplot(2, 2, 3)
+        width = discretize(abs(diff(vals2([v1, v2]))), ...
+            linspace(min(tmp), max(tmp), 8))*0.6;
+        plot([medoids(v1, 2) medoids(v2, 2)], ...
+            [medoids(v1, 1) medoids(v2, 1)], 'Color', 'k', ...
+            'LineWidth', width);
+        diffacc(v1, v2) = abs(diff(vals([v1, v2]))) - abs(diff(vals2([v1, v2])));
+    end
+end
+
+
+clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+    inflections* formant *model
+
+%% Figure 3 (e) - summary of subpopulation decoding
+
+load('svmClassOrder.mat');
+ord = [classOrd.classesNum];
+
+% find index of pair
+% summary with accuracy
+acc = arrayfun(@(i) cellfun(@(x) x(all([classOrd.classesNum] == ord(:, i))), ...
+    decode_all.confMat), 1:size(ord, 2), 'UniformOutput', false);  
+acc = cat(3, acc{:});
+
+summaryDecode(Dvow, acc, 0.0001)
+
+confacc = nan(3, 5, 5);
+ctr = 1;
+for pair = ord
+    confacc(:, pair(1)+1, pair(2)+1) = mean(acc(:, :, ctr));
     ctr = ctr+1;
 end
 
+figure;
+tmp = squeeze(confacc(1, :, :)-confacc(2, :, :));
+tmp(isnan(tmp)) = 0;
+imagesc(tmp);
+
+% formatting
+xticks(1:5); yticks(1:5);
+xticklabels({'a', 'e', 'i', 'o', 'u'});
+yticklabels({'a', 'e', 'i', 'o', 'u'});
+colormap(flipud(brewermap(15, 'RdBu')));
+caxis([-0.1 0.1]);
+ylim([0.5 4.5]);
+xlim([1.5 5.5]);
+
+
 clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
     inflections* formant *model
 
+%% Figure 3 - SUPP: STATS on subpopulation differences
 
-%% -------------------------- Functions -----------------------------------
-function [inflections] = loadF0Infl(formant, infoStruct, SIDs)
-   
-    % set properties of analysis
-    % variable so we can use different speaker betas
-    % infoStruct = {betaInfo, betaInfo_lte170, betaInfo_gt170}; 
-    
-    inflections =  array2table(zeros(0,8), 'VariableNames', ...
-        {'SID', 'el', 'sr', 'infl', 'sr_lte170', 'infl_lte170', 'sr_gt170', 'infl_gt170'});
+% each row is a pair, first column is median accuracy, second column is t-stat, 
+% third is p val
+supp_stats =  array2table(zeros(0,4), 'VariableNames', ...
+    {'pair', 'acc', 'z-val', 'p-val'});
+for i = 1:size(decode_all.acc)
+    Y = [squeeze(decode_all.acc(i, :, 2)); squeeze(decode_all.acc(i, :, 3))];
+    [h,p, ~, stats] = ttest2(Y(1, :), Y(2, :));
+    pair_label = strjoin(decode_all.class_ord(i).classes);
+    supp_stats = [supp_stats; {pair_label, mean(Y, 2), stats.tstat, p}];
+end
+disp(supp_stats)
 
-    for s = 1:length(SIDs)
-        SID=SIDs{s};
-        ctr = 1;
+load('out_elecs_voweltypeftest_bychan_anon.mat')
 
-        if isfield(infoStruct{1}, SID) && ~isempty(infoStruct{1}.(SID).els)   
-            sr = nan(length(infoStruct), length(infoStruct{1}.(SID).els))';
-            infl = nan(length(infoStruct), length(infoStruct{1}.(SID).els))';
-            for i = infoStruct
-                info = i{1};
-                if isfield(info, SID) && ~isempty(info.(SID).els)           
-                % difference between sigmoid and linear rsq (for both formants)   
+clearvars -except *all subj *vow *SIDs datapath bef aft tps betaInfo* ...
+    inflections* formant *model
 
-                    % significant linear vs significant rsq
-                    sr(:, ctr) = squeeze(info.(SID).rsq(3, :, formant))'; 
+%% ------------------------ Functions -------------------------------------
 
-                    % inflection points
-                    infl(:, ctr)=info.(SID).beta_sigm(:, formant, 3);                     
-                    clear sigrsq* linrsq* 
-                end
-                ctr = ctr + 1;
-            end
-            sids = repmat(str2double(SID(2:end)), length(infoStruct{1}.(SID).els), 1);
+function [allidx, fvals] = saveElecs(SIDs, corpus, Dvow)
+    % finds subject specific max time point
+    info=struct();
+    info.resp='resp'; 
+    [allidx, fvals] = getElecs(Dvow, SIDs, [], corpus, 'ftest', info);
+    save('out_elecs_voweltypeftest_bychan.mat', 'allidx', 'fvals');
+end
 
-            if ~isempty(infoStruct{1}.(SID).els)
-                t2 = array2table([sids infoStruct{1}.(SID).els sr(:, 1) infl(:, 1) ...
-                            sr(:, 2) infl(:, 2) sr(:, 3) infl(:, 3)], ...
-                            'VariableNames',  {'SID', 'el', 'sr', 'infl', 'sr_lte170', 'infl_lte170', ...
-                            'sr_gt170', 'infl_gt170'});
-                inflections = [inflections; t2];
-            end
-        end
-    end
+% find the subplot number based on a grid formant of the subplot
+function plotNum = gridCount(row, col, ~, cols)
+    plotNum =  (row-1)*cols + col;
 end

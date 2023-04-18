@@ -30,8 +30,8 @@ function [mni_plot] = plotMNIElec(SIDs, desel, hemi, datapath)
             
             x_add=70;
             % z dimension for specific subjects
-            if ismember(SID, {'S6'}), x_add=90; end
-            if ismember(SID, {'S1'}), x_add=-90; end
+            if ismember(SID, {'S6', 'S5'}), x_add=40; end
+            if ismember(SID, {'S1'}), x_add=-50; end
             if ismember(SID, {'S9'}), x_add=-200; end
             if strcmp(hemi,'lh'), x_add=x_add-90; end
             

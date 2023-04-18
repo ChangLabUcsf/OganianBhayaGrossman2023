@@ -398,7 +398,7 @@ clear cs cbh
 % correlation 
 [r, p] = corr(all_slopes(:, 1), all_slopes(:, 2));
 disp(['Rho of slopes ' num2str(r) ' at p=' num2str(p)]);
-disp(['Number of electrodes ' num2str(numel)]);
+% disp(['Number of electrodes ' num2str(numel)]);
 
 % linear mixed effect model
 disp('----------------------- F1-F2 effects ----------------------- ')
